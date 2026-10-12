@@ -2,6 +2,7 @@ package com.example.rbpolab1.service;
 
 import com.example.rbpolab1.model.Route;
 import com.example.rbpolab1.repository.RouteRepository;
+import com.example.rbpolab1.repository.StopRepository;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -14,9 +15,12 @@ import java.util.Set;
 public class RouteService {
 
     private final RouteRepository routeRepository;
+    private final StopRepository stopRepository;
 
-    public RouteService(RouteRepository routeRepository) {
+    public RouteService(RouteRepository routeRepository,
+                        StopRepository stopRepository) {
         this.routeRepository = routeRepository;
+        this.stopRepository = stopRepository;
     }
 
     public List<Route> findAll() {
@@ -73,6 +77,13 @@ public class RouteService {
 
     public synchronized void delete(Long id) {
         findById(id);
+
+        if (stopRepository.existsByRouteId(id)) {
+            throw new IllegalStateException(
+                    "Cannot delete a route with stops"
+            );
+        }
+
         routeRepository.deleteById(id);
     }
 
