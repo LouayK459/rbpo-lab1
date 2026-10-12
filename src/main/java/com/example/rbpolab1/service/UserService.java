@@ -1,6 +1,7 @@
 package com.example.rbpolab1.service;
 
 import com.example.rbpolab1.model.User;
+import com.example.rbpolab1.repository.ShipmentRepository;
 import com.example.rbpolab1.repository.UserRepository;
 import org.springframework.stereotype.Service;
 
@@ -11,9 +12,12 @@ import java.util.NoSuchElementException;
 public class UserService {
 
     private final UserRepository userRepository;
+    private final ShipmentRepository shipmentRepository;
 
-    public UserService(UserRepository userRepository) {
+    public UserService(UserRepository userRepository,
+                       ShipmentRepository shipmentRepository) {
         this.userRepository = userRepository;
+        this.shipmentRepository = shipmentRepository;
     }
 
     public List<User> findAll() {
@@ -29,6 +33,7 @@ public class UserService {
     public synchronized User create(String name) {
         String validName = validateName(name);
         User user = new User(null, validName);
+
         return userRepository.save(user);
     }
 
@@ -41,11 +46,19 @@ public class UserService {
 
         String validName = validateName(name);
         User updatedUser = new User(id, validName);
+
         return userRepository.save(updatedUser);
     }
 
     public synchronized void delete(Long id) {
         findById(id);
+
+        if (shipmentRepository.existsBySenderId(id)) {
+            throw new IllegalStateException(
+                    "Cannot delete a user with shipments"
+            );
+        }
+
         userRepository.deleteById(id);
     }
 
