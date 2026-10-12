@@ -2,6 +2,7 @@ package com.example.rbpolab1.service;
 
 import com.example.rbpolab1.model.Stop;
 import com.example.rbpolab1.repository.RouteRepository;
+import com.example.rbpolab1.repository.ShipmentAssignmentRepository;
 import com.example.rbpolab1.repository.StopRepository;
 import org.springframework.stereotype.Service;
 
@@ -13,11 +14,15 @@ public class StopService {
 
     private final StopRepository stopRepository;
     private final RouteRepository routeRepository;
+    private final ShipmentAssignmentRepository assignmentRepository;
 
-    public StopService(StopRepository stopRepository,
-                       RouteRepository routeRepository) {
+    public StopService(
+            StopRepository stopRepository,
+            RouteRepository routeRepository,
+            ShipmentAssignmentRepository assignmentRepository) {
         this.stopRepository = stopRepository;
         this.routeRepository = routeRepository;
+        this.assignmentRepository = assignmentRepository;
     }
 
     public List<Stop> findAll() {
@@ -80,6 +85,13 @@ public class StopService {
 
     public synchronized void delete(Long id) {
         findById(id);
+
+        if (assignmentRepository.existsByStopId(id)) {
+            throw new IllegalStateException(
+                    "Cannot delete a stop with assignments"
+            );
+        }
+
         stopRepository.deleteById(id);
     }
 

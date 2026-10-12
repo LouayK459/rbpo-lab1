@@ -1,6 +1,7 @@
 package com.example.rbpolab1.service;
 
 import com.example.rbpolab1.model.Shipment;
+import com.example.rbpolab1.repository.ShipmentAssignmentRepository;
 import com.example.rbpolab1.repository.ShipmentRepository;
 import com.example.rbpolab1.repository.UserRepository;
 import org.springframework.stereotype.Service;
@@ -16,11 +17,15 @@ public class ShipmentService {
 
     private final ShipmentRepository shipmentRepository;
     private final UserRepository userRepository;
+    private final ShipmentAssignmentRepository assignmentRepository;
 
-    public ShipmentService(ShipmentRepository shipmentRepository,
-                           UserRepository userRepository) {
+    public ShipmentService(
+            ShipmentRepository shipmentRepository,
+            UserRepository userRepository,
+            ShipmentAssignmentRepository assignmentRepository) {
         this.shipmentRepository = shipmentRepository;
         this.userRepository = userRepository;
+        this.assignmentRepository = assignmentRepository;
     }
 
     public List<Shipment> findAll() {
@@ -38,6 +43,7 @@ public class ShipmentService {
         validateSender(senderId);
         String validAddress = validateAddress(address);
         validateWeight(weight);
+
         String validStatus = validateStatus(
                 status == null ? "CREATED" : status
         );
@@ -90,12 +96,21 @@ public class ShipmentService {
 
     public synchronized void delete(Long id) {
         findById(id);
+
+        if (assignmentRepository.existsByShipmentId(id)) {
+            throw new IllegalStateException(
+                    "Cannot delete a shipment with assignments"
+            );
+        }
+
         shipmentRepository.deleteById(id);
     }
 
     private void validateSender(Long senderId) {
         if (senderId == null || senderId <= 0) {
-            throw new IllegalArgumentException("Valid senderId is required");
+            throw new IllegalArgumentException(
+                    "Valid senderId is required"
+            );
         }
 
         if (!userRepository.existsById(senderId)) {
