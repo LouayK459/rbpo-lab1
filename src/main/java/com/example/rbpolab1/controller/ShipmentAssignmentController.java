@@ -1,6 +1,7 @@
 package com.example.rbpolab1.controller;
 
 import com.example.rbpolab1.model.ShipmentAssignment;
+import com.example.rbpolab1.service.DeliveryService;
 import com.example.rbpolab1.service.ShipmentAssignmentService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -20,10 +21,13 @@ import java.util.List;
 public class ShipmentAssignmentController {
 
     private final ShipmentAssignmentService assignmentService;
+    private final DeliveryService deliveryService;
 
     public ShipmentAssignmentController(
-            ShipmentAssignmentService assignmentService) {
+            ShipmentAssignmentService assignmentService,
+            DeliveryService deliveryService) {
         this.assignmentService = assignmentService;
+        this.deliveryService = deliveryService;
     }
 
     @GetMapping
@@ -70,6 +74,11 @@ public class ShipmentAssignmentController {
         return ResponseEntity.noContent().build();
     }
 
+    @PostMapping("/{id}/complete")
+    public ShipmentAssignment complete(@PathVariable("id") Long id) {
+        return deliveryService.completeAssignment(id);
+    }
+
     private void validateRequest(ShipmentAssignment request) {
         if (request == null) {
             throw new IllegalArgumentException("Request body is required");
@@ -78,6 +87,12 @@ public class ShipmentAssignmentController {
         if (request.getCreatedAt() != null) {
             throw new IllegalArgumentException(
                     "createdAt is set by the server"
+            );
+        }
+
+        if (request.getCompletedAt() != null) {
+            throw new IllegalArgumentException(
+                    "completedAt is set by the server"
             );
         }
     }

@@ -79,5 +79,11 @@ public class ShipmentController {
                     "createdAt is set by the server"
             );
         }
+
+        if (request.getDeliveredAt() != null) {
+            throw new IllegalArgumentException(
+                    "deliveredAt is set by the server"
+            );
+        }
     }
 }

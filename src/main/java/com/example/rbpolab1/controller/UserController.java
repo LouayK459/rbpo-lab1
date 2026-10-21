@@ -37,6 +37,7 @@ public class UserController {
 
     @PostMapping
     public ResponseEntity<User> create(@RequestBody User request) {
+        validateRequest(request);
         User user = userService.create(request.getName());
         return ResponseEntity.status(HttpStatus.CREATED).body(user);
     }
@@ -45,6 +46,7 @@ public class UserController {
     public User update(
             @PathVariable("id") Long id,
             @RequestBody User request) {
+        validateRequest(request);
         return userService.update(id, request.getName());
     }
 
@@ -52,5 +54,11 @@ public class UserController {
     public ResponseEntity<Void> delete(@PathVariable("id") Long id) {
         userService.delete(id);
         return ResponseEntity.noContent().build();
+    }
+
+    private void validateRequest(User request) {
+        if (request == null) {
+            throw new IllegalArgumentException("Request body is required");
+        }
     }
 }

@@ -1,17 +1,25 @@
 package com.example.rbpolab1.service;
 
+import com.example.rbpolab1.model.Route;
+import com.example.rbpolab1.model.Shipment;
 import com.example.rbpolab1.model.ShipmentAssignment;
+import com.example.rbpolab1.model.Stop;
 import com.example.rbpolab1.repository.ShipmentAssignmentRepository;
 import com.example.rbpolab1.repository.ShipmentRepository;
 import com.example.rbpolab1.repository.StopRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.Set;
 
 @Service
+@Transactional(isolation = Isolation.SERIALIZABLE)
 public class ShipmentAssignmentService {
 
     private final ShipmentAssignmentRepository assignmentRepository;
@@ -37,28 +45,33 @@ public class ShipmentAssignmentService {
                         new NoSuchElementException("Assignment not found"));
     }
 
-    public synchronized ShipmentAssignment create(
+    public ShipmentAssignment create(
             Long shipmentId, Long stopId, String status) {
-        validateShipment(shipmentId);
-        validateStop(stopId);
-        validateUniqueShipment(shipmentId, null);
+        Shipment shipment = findShipment(shipmentId);
+        Stop stop = findStop(stopId);
 
         String validStatus = validateStatus(
                 status == null ? "ASSIGNED" : status
         );
 
-        ShipmentAssignment assignment = new ShipmentAssignment(
-                null,
-                shipmentId,
-                stopId,
-                validStatus,
-                Instant.now()
-        );
+        if (!"ASSIGNED".equals(validStatus)) {
+            throw new IllegalStateException(
+                    "A new assignment must have status ASSIGNED"
+            );
+        }
+
+        validateAssignment(shipment, stop, null);
+
+        ShipmentAssignment assignment = new ShipmentAssignment();
+        assignment.setShipment(shipment);
+        assignment.setStop(stop);
+        assignment.setStatus(validStatus);
+        assignment.setCreatedAt(Instant.now());
 
         return assignmentRepository.save(assignment);
     }
 
-    public synchronized ShipmentAssignment update(
+    public ShipmentAssignment update(
             Long id, Long shipmentId, Long stopId, String status) {
         ShipmentAssignment existingAssignment = findById(id);
 
@@ -68,71 +81,117 @@ public class ShipmentAssignmentService {
         Long updatedStopId = stopId == null
                 ? existingAssignment.getStopId() : stopId;
 
-        String updatedStatus = status == null
-                ? existingAssignment.getStatus() : status;
-
-        validateShipment(updatedShipmentId);
-        validateStop(updatedStopId);
-        validateUniqueShipment(updatedShipmentId, id);
-        updatedStatus = validateStatus(updatedStatus);
-
-        ShipmentAssignment updatedAssignment = new ShipmentAssignment(
-                id,
-                updatedShipmentId,
-                updatedStopId,
-                updatedStatus,
-                existingAssignment.getCreatedAt()
+        String updatedStatus = validateStatus(
+                status == null ? existingAssignment.getStatus() : status
         );
 
-        return assignmentRepository.save(updatedAssignment);
+        if (!updatedStatus.equals(existingAssignment.getStatus())) {
+            throw new IllegalStateException(
+                    "Use delivery operations to change assignment status"
+            );
+        }
+
+        Shipment shipment = findShipment(updatedShipmentId);
+        Stop stop = findStop(updatedStopId);
+
+        boolean changed = !Objects.equals(
+                existingAssignment.getShipmentId(), updatedShipmentId
+        ) || !Objects.equals(
+                existingAssignment.getStopId(), updatedStopId
+        );
+
+        if (changed) {
+            requireEditable(existingAssignment);
+            validateAssignment(shipment, stop, id);
+            existingAssignment.setShipment(shipment);
+            existingAssignment.setStop(stop);
+        }
+
+        return assignmentRepository.save(existingAssignment);
     }
 
-    public synchronized void delete(Long id) {
-        findById(id);
-        assignmentRepository.deleteById(id);
+    public void delete(Long id) {
+        ShipmentAssignment assignment = findById(id);
+        requireEditable(assignment);
+        assignmentRepository.delete(assignment);
     }
 
-    private void validateShipment(Long shipmentId) {
+    private Shipment findShipment(Long shipmentId) {
         if (shipmentId == null || shipmentId <= 0) {
             throw new IllegalArgumentException(
                     "Valid shipmentId is required"
             );
         }
 
-        if (!shipmentRepository.existsById(shipmentId)) {
-            throw new NoSuchElementException("Shipment not found");
-        }
+        return shipmentRepository.findById(shipmentId)
+                .orElseThrow(() ->
+                        new NoSuchElementException("Shipment not found"));
     }
 
-    private void validateStop(Long stopId) {
+    private Stop findStop(Long stopId) {
         if (stopId == null || stopId <= 0) {
             throw new IllegalArgumentException(
                     "Valid stopId is required"
             );
         }
 
-        if (!stopRepository.existsById(stopId)) {
-            throw new NoSuchElementException("Stop not found");
+        return stopRepository.findById(stopId)
+                .orElseThrow(() ->
+                        new NoSuchElementException("Stop not found"));
+    }
+
+    private void requireEditable(ShipmentAssignment assignment) {
+        if (!"ASSIGNED".equals(assignment.getStatus())
+                || !"PLANNED".equals(assignment.getStop().getRoute().getStatus())
+                || !"CREATED".equals(assignment.getShipment().getStatus())) {
+            throw new IllegalStateException(
+                    "Only assignments on a planned route can be changed"
+            );
         }
     }
 
-    private void validateUniqueShipment(Long shipmentId, Long excludedId) {
+    private void validateAssignment(
+            Shipment shipment, Stop stop, Long excludedId) {
+        Route route = stop.getRoute();
+
+        if (!"PLANNED".equals(route.getStatus())) {
+            throw new IllegalStateException("Route must be PLANNED");
+        }
+
+        if (!"CREATED".equals(shipment.getStatus())) {
+            throw new IllegalStateException("Shipment must be CREATED");
+        }
+
+        if (!shipment.getAddress().equals(stop.getAddress())) {
+            throw new IllegalStateException(
+                    "Shipment and stop addresses must match"
+            );
+        }
+
         if (assignmentRepository.isShipmentAssigned(
-                shipmentId, excludedId)) {
+                shipment.getId(), excludedId)) {
             throw new IllegalStateException(
                     "Shipment is already assigned"
             );
+        }
+
+        BigDecimal totalWeight = assignmentRepository.totalWeightForRoute(
+                route.getId(), excludedId
+        ).add(shipment.getWeight());
+
+        if (totalWeight.compareTo(route.getMaxWeight()) > 0) {
+            throw new IllegalStateException("Route capacity exceeded");
         }
     }
 
     private String validateStatus(String status) {
         Set<String> allowedStatuses = Set.of(
-                "ASSIGNED", "IN_PROGRESS", "COMPLETED"
+                "ASSIGNED", "IN_PROGRESS", "COMPLETED", "CANCELLED"
         );
 
         if (!allowedStatuses.contains(status)) {
             throw new IllegalArgumentException(
-                    "Status must be ASSIGNED, IN_PROGRESS or COMPLETED"
+                    "Status must be ASSIGNED, IN_PROGRESS, COMPLETED or CANCELLED"
             );
         }
 
