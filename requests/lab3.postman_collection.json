@@ -1,0 +1,2043 @@
+{
+  "info": {
+    "name": "РБПО — лабораторная 3 — маршрутизация доставки",
+    "description": "Выполнить всю коллекцию по порядку с работающим сервером и настроенной БД. ID берутся из ответов: коллекция не зависит от ID из seed.sql. CRUD-данные удаляются; завершённые и отменённые доставки бизнес-сценария сохраняются как история. Даты формируются автоматически. Пароли БД не нужны.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "const today = new Date();",
+          "const nextWeek = new Date(today.getTime());",
+          "nextWeek.setUTCDate(nextWeek.getUTCDate() + 7);",
+          "pm.collectionVariables.set(\"routeDate\", today.toISOString().slice(0, 10));",
+          "pm.collectionVariables.set(\"repeatDate\", nextWeek.toISOString().slice(0, 10));"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "1. CRUD всех пяти сущностей и ограничения удаления",
+      "item": [
+        {
+          "name": "01. Создать пользователя",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/users",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Lab3 CRUD\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Ожидается HTTP 201. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", function () { pm.expect(pm.response.code).to.eql(201); });",
+                  "if (pm.response.code === 201) {",
+                  "const data = pm.response.json();",
+                  "pm.collectionVariables.set(\"cUserId\", String(data.id));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02. Список пользователей",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/users",
+            "description": "Ожидается HTTP 200. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.expect(pm.response.code).to.eql(200); });",
+                  "if (pm.response.code === 200) {",
+                  "const data = pm.response.json();",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03. Пользователь по ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/users/{{cUserId}}",
+            "description": "Ожидается HTTP 200. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.expect(pm.response.code).to.eql(200); });",
+                  "if (pm.response.code === 200) {",
+                  "const data = pm.response.json();",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04. Изменить имя",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/users/{{cUserId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Lab3 CRUD updated\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Ожидается HTTP 200. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.expect(pm.response.code).to.eql(200); });",
+                  "if (pm.response.code === 200) {",
+                  "const data = pm.response.json();",
+                  "pm.test(\"Поле name\", function () { pm.expect(data.name).to.eql(\"Lab3 CRUD updated\"); });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "05. Создать маршрут",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/routes",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"date\": \"{{routeDate}}\",\n  \"maxWeight\": 20\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Ожидается HTTP 201. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", function () { pm.expect(pm.response.code).to.eql(201); });",
+                  "if (pm.response.code === 201) {",
+                  "const data = pm.response.json();",
+                  "pm.collectionVariables.set(\"cRouteId\", String(data.id));",
+                  "pm.test(\"Статус PLANNED\", function () { pm.expect(data.status).to.eql(\"PLANNED\"); });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "06. Список маршрутов",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/routes",
+            "description": "Ожидается HTTP 200. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.expect(pm.response.code).to.eql(200); });",
+                  "if (pm.response.code === 200) {",
+                  "const data = pm.response.json();",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "07. Маршрут по ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/routes/{{cRouteId}}",
+            "description": "Ожидается HTTP 200. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.expect(pm.response.code).to.eql(200); });",
+                  "if (pm.response.code === 200) {",
+                  "const data = pm.response.json();",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "08. Изменить грузоподъёмность",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/routes/{{cRouteId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"maxWeight\": 25\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Ожидается HTTP 200. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.expect(pm.response.code).to.eql(200); });",
+                  "if (pm.response.code === 200) {",
+                  "const data = pm.response.json();",
+                  "pm.test(\"Поле maxWeight\", function () { pm.expect(data.maxWeight).to.eql(25); });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "09. Создать отправление",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/shipments",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"senderId\": {{cUserId}},\n  \"address\": \"Moscow, Aviamotornaya 8\",\n  \"weight\": 2.5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Ожидается HTTP 201. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", function () { pm.expect(pm.response.code).to.eql(201); });",
+                  "if (pm.response.code === 201) {",
+                  "const data = pm.response.json();",
+                  "pm.collectionVariables.set(\"cShipmentId\", String(data.id));",
+                  "pm.test(\"Статус CREATED\", function () { pm.expect(data.status).to.eql(\"CREATED\"); });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "10. Список отправлений",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/shipments",
+            "description": "Ожидается HTTP 200. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.expect(pm.response.code).to.eql(200); });",
+                  "if (pm.response.code === 200) {",
+                  "const data = pm.response.json();",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "11. Отправление по ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/shipments/{{cShipmentId}}",
+            "description": "Ожидается HTTP 200. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.expect(pm.response.code).to.eql(200); });",
+                  "if (pm.response.code === 200) {",
+                  "const data = pm.response.json();",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "12. Изменить вес",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/shipments/{{cShipmentId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"weight\": 3.5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Ожидается HTTP 200. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.expect(pm.response.code).to.eql(200); });",
+                  "if (pm.response.code === 200) {",
+                  "const data = pm.response.json();",
+                  "pm.test(\"Поле weight\", function () { pm.expect(data.weight).to.eql(3.5); });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "13. Клиент не задаёт время вручения",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/shipments/{{cShipmentId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"deliveredAt\": \"2026-01-01T00:00:00Z\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Ожидается HTTP 400. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () { pm.expect(pm.response.code).to.eql(400); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "14. Создать остановку",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/stops",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"routeId\": {{cRouteId}},\n  \"address\": \"Moscow, Aviamotornaya 8\",\n  \"sequenceNumber\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Ожидается HTTP 201. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", function () { pm.expect(pm.response.code).to.eql(201); });",
+                  "if (pm.response.code === 201) {",
+                  "const data = pm.response.json();",
+                  "pm.collectionVariables.set(\"cStopId\", String(data.id));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "15. Список остановок",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/stops",
+            "description": "Ожидается HTTP 200. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.expect(pm.response.code).to.eql(200); });",
+                  "if (pm.response.code === 200) {",
+                  "const data = pm.response.json();",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "16. Остановка по ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/stops/{{cStopId}}",
+            "description": "Ожидается HTTP 200. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.expect(pm.response.code).to.eql(200); });",
+                  "if (pm.response.code === 200) {",
+                  "const data = pm.response.json();",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "17. Изменить порядок остановки",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/stops/{{cStopId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sequenceNumber\": 2\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Ожидается HTTP 200. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.expect(pm.response.code).to.eql(200); });",
+                  "if (pm.response.code === 200) {",
+                  "const data = pm.response.json();",
+                  "pm.test(\"Поле sequenceNumber\", function () { pm.expect(data.sequenceNumber).to.eql(2); });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "18. Вторая остановка для изменения назначения",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/stops",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"routeId\": {{cRouteId}},\n  \"address\": \"Moscow, Aviamotornaya 8\",\n  \"sequenceNumber\": 3\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Ожидается HTTP 201. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", function () { pm.expect(pm.response.code).to.eql(201); });",
+                  "if (pm.response.code === 201) {",
+                  "const data = pm.response.json();",
+                  "pm.collectionVariables.set(\"cOtherStopId\", String(data.id));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "19. Назначить отправление на остановку",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/shipment-assignments",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"shipmentId\": {{cShipmentId}},\n  \"stopId\": {{cStopId}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Ожидается HTTP 201. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", function () { pm.expect(pm.response.code).to.eql(201); });",
+                  "if (pm.response.code === 201) {",
+                  "const data = pm.response.json();",
+                  "pm.collectionVariables.set(\"cAssignmentId\", String(data.id));",
+                  "pm.test(\"Статус ASSIGNED\", function () { pm.expect(data.status).to.eql(\"ASSIGNED\"); });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "20. Список назначений",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/shipment-assignments",
+            "description": "Ожидается HTTP 200. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.expect(pm.response.code).to.eql(200); });",
+                  "if (pm.response.code === 200) {",
+                  "const data = pm.response.json();",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "21. Назначение по ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/shipment-assignments/{{cAssignmentId}}",
+            "description": "Ожидается HTTP 200. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.expect(pm.response.code).to.eql(200); });",
+                  "if (pm.response.code === 200) {",
+                  "const data = pm.response.json();",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "22. Перенести назначение на другую остановку",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/shipment-assignments/{{cAssignmentId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"stopId\": {{cOtherStopId}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Ожидается HTTP 200. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.expect(pm.response.code).to.eql(200); });",
+                  "if (pm.response.code === 200) {",
+                  "const data = pm.response.json();",
+                  "pm.test(\"Новая остановка\", function () { pm.expect(data.stopId).to.eql(Number(pm.collectionVariables.get(\"cOtherStopId\"))); });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "23. Клиент не задаёт время завершения",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/shipment-assignments/{{cAssignmentId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"completedAt\": \"2026-01-01T00:00:00Z\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Ожидается HTTP 400. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () { pm.expect(pm.response.code).to.eql(400); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "24. Нельзя удалить пользователя с отправлениями",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/users/{{cUserId}}",
+            "description": "Ожидается HTTP 409. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 409\", function () { pm.expect(pm.response.code).to.eql(409); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "25. Нельзя удалить маршрут с остановками",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/routes/{{cRouteId}}",
+            "description": "Ожидается HTTP 409. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 409\", function () { pm.expect(pm.response.code).to.eql(409); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "26. Нельзя удалить отправление с назначением",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/shipments/{{cShipmentId}}",
+            "description": "Ожидается HTTP 409. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 409\", function () { pm.expect(pm.response.code).to.eql(409); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "27. Нельзя удалить остановку с назначением",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/stops/{{cOtherStopId}}",
+            "description": "Ожидается HTTP 409. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 409\", function () { pm.expect(pm.response.code).to.eql(409); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "28. Удалить назначение",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/shipment-assignments/{{cAssignmentId}}",
+            "description": "Ожидается HTTP 204. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", function () { pm.expect(pm.response.code).to.eql(204); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "29. Удалённое назначение не найдено",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/shipment-assignments/{{cAssignmentId}}",
+            "description": "Ожидается HTTP 404. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 404\", function () { pm.expect(pm.response.code).to.eql(404); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "30. Удалить вторую остановку",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/stops/{{cOtherStopId}}",
+            "description": "Ожидается HTTP 204. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", function () { pm.expect(pm.response.code).to.eql(204); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "31. Удалить первую остановку",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/stops/{{cStopId}}",
+            "description": "Ожидается HTTP 204. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", function () { pm.expect(pm.response.code).to.eql(204); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "32. Удалённая остановка не найдена",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/stops/{{cStopId}}",
+            "description": "Ожидается HTTP 404. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 404\", function () { pm.expect(pm.response.code).to.eql(404); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "33. Удалить отправление",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/shipments/{{cShipmentId}}",
+            "description": "Ожидается HTTP 204. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", function () { pm.expect(pm.response.code).to.eql(204); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "34. Удалённое отправление не найдено",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/shipments/{{cShipmentId}}",
+            "description": "Ожидается HTTP 404. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 404\", function () { pm.expect(pm.response.code).to.eql(404); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "35. Удалить маршрут",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/routes/{{cRouteId}}",
+            "description": "Ожидается HTTP 204. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", function () { pm.expect(pm.response.code).to.eql(204); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "36. Удалённый маршрут не найден",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/routes/{{cRouteId}}",
+            "description": "Ожидается HTTP 404. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 404\", function () { pm.expect(pm.response.code).to.eql(404); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "37. Удалить пользователя",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/users/{{cUserId}}",
+            "description": "Ожидается HTTP 204. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", function () { pm.expect(pm.response.code).to.eql(204); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "38. Удалённый пользователь не найден",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/users/{{cUserId}}",
+            "description": "Ожидается HTTP 404. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 404\", function () { pm.expect(pm.response.code).to.eql(404); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "39. Пустое имя отклоняется",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/users",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"   \"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Ожидается HTTP 400. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () { pm.expect(pm.response.code).to.eql(400); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "40. Некорректный ID отклоняется",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/users/abc",
+            "description": "Ожидается HTTP 400. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () { pm.expect(pm.response.code).to.eql(400); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. Пять бизнес-операций: доставка, повторение, отмена и переназначение",
+      "item": [
+        {
+          "name": "01. Отправитель для бизнес-сценария",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/users",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Lab3 delivery scenario\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Ожидается HTTP 201. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", function () { pm.expect(pm.response.code).to.eql(201); });",
+                  "if (pm.response.code === 201) {",
+                  "const data = pm.response.json();",
+                  "pm.collectionVariables.set(\"bUserId\", String(data.id));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02. Плановый маршрут",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/routes",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"date\": \"{{routeDate}}\",\n  \"maxWeight\": 20\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Ожидается HTTP 201. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", function () { pm.expect(pm.response.code).to.eql(201); });",
+                  "if (pm.response.code === 201) {",
+                  "const data = pm.response.json();",
+                  "pm.collectionVariables.set(\"bRouteId\", String(data.id));",
+                  "pm.test(\"Статус PLANNED\", function () { pm.expect(data.status).to.eql(\"PLANNED\"); });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03. Отправление",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/shipments",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"senderId\": {{bUserId}},\n  \"address\": \"Moscow, Aviamotornaya 8\",\n  \"weight\": 2.5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Ожидается HTTP 201. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", function () { pm.expect(pm.response.code).to.eql(201); });",
+                  "if (pm.response.code === 201) {",
+                  "const data = pm.response.json();",
+                  "pm.collectionVariables.set(\"bShipmentId\", String(data.id));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04. Остановка",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/stops",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"routeId\": {{bRouteId}},\n  \"address\": \"Moscow, Aviamotornaya 8\",\n  \"sequenceNumber\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Ожидается HTTP 201. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", function () { pm.expect(pm.response.code).to.eql(201); });",
+                  "if (pm.response.code === 201) {",
+                  "const data = pm.response.json();",
+                  "pm.collectionVariables.set(\"bStopId\", String(data.id));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "05. Назначение",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/shipment-assignments",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"shipmentId\": {{bShipmentId}},\n  \"stopId\": {{bStopId}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Ожидается HTTP 201. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", function () { pm.expect(pm.response.code).to.eql(201); });",
+                  "if (pm.response.code === 201) {",
+                  "const data = pm.response.json();",
+                  "pm.collectionVariables.set(\"bAssignmentId\", String(data.id));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "06. Повторное активное назначение запрещено",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/shipment-assignments",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"shipmentId\": {{bShipmentId}},\n  \"stopId\": {{bStopId}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Ожидается HTTP 409. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 409\", function () { pm.expect(pm.response.code).to.eql(409); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "07. Вручение до выезда запрещено",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/shipment-assignments/{{bAssignmentId}}/complete",
+            "description": "Ожидается HTTP 409. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 409\", function () { pm.expect(pm.response.code).to.eql(409); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "08. Запуск маршрута",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/routes/{{bRouteId}}/start",
+            "description": "Ожидается HTTP 200. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.expect(pm.response.code).to.eql(200); });",
+                  "if (pm.response.code === 200) {",
+                  "const data = pm.response.json();",
+                  "pm.test(\"Статус IN_PROGRESS\", function () { pm.expect(data.status).to.eql(\"IN_PROGRESS\"); });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "09. Отправление теперь в пути",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/shipments/{{bShipmentId}}",
+            "description": "Ожидается HTTP 200. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.expect(pm.response.code).to.eql(200); });",
+                  "if (pm.response.code === 200) {",
+                  "const data = pm.response.json();",
+                  "pm.test(\"Статус IN_TRANSIT\", function () { pm.expect(data.status).to.eql(\"IN_TRANSIT\"); });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "10. Отмена после выезда запрещена",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/routes/{{bRouteId}}/cancel",
+            "description": "Ожидается HTTP 409. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 409\", function () { pm.expect(pm.response.code).to.eql(409); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "11. Завершение с недоставленным отправлением запрещено",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/routes/{{bRouteId}}/complete",
+            "description": "Ожидается HTTP 409. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 409\", function () { pm.expect(pm.response.code).to.eql(409); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "12. Подтвердить вручение",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/shipment-assignments/{{bAssignmentId}}/complete",
+            "description": "Ожидается HTTP 200. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.expect(pm.response.code).to.eql(200); });",
+                  "if (pm.response.code === 200) {",
+                  "const data = pm.response.json();",
+                  "pm.test(\"Статус COMPLETED\", function () { pm.expect(data.status).to.eql(\"COMPLETED\"); });",
+                  "pm.test(\"Время вручения заполнено\", function () { pm.expect(data.completedAt).to.be.a(\"string\"); });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "13. Прочитать сохранённое время завершения",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/shipment-assignments/{{bAssignmentId}}",
+            "description": "Ожидается HTTP 200. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.expect(pm.response.code).to.eql(200); });",
+                  "if (pm.response.code === 200) {",
+                  "const data = pm.response.json();",
+                  "pm.test(\"Статус COMPLETED\", function () { pm.expect(data.status).to.eql(\"COMPLETED\"); });",
+                  "pm.collectionVariables.set(\"handoverTime\", data.completedAt);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "14. Статус и время вручения отправления",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/shipments/{{bShipmentId}}",
+            "description": "Ожидается HTTP 200. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.expect(pm.response.code).to.eql(200); });",
+                  "if (pm.response.code === 200) {",
+                  "const data = pm.response.json();",
+                  "pm.test(\"Статус DELIVERED\", function () { pm.expect(data.status).to.eql(\"DELIVERED\"); });",
+                  "pm.test(\"Время вручения совпадает\", function () { pm.expect(data.deliveredAt).to.eql(pm.collectionVariables.get(\"handoverTime\")); });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "15. Завершить маршрут",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/routes/{{bRouteId}}/complete",
+            "description": "Ожидается HTTP 200. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.expect(pm.response.code).to.eql(200); });",
+                  "if (pm.response.code === 200) {",
+                  "const data = pm.response.json();",
+                  "pm.test(\"Статус COMPLETED\", function () { pm.expect(data.status).to.eql(\"COMPLETED\"); });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "16. Повторить завершённый маршрут на новую дату",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/routes/{{bRouteId}}/repeat",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"date\": \"{{repeatDate}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Ожидается HTTP 201. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", function () { pm.expect(pm.response.code).to.eql(201); });",
+                  "if (pm.response.code === 201) {",
+                  "const data = pm.response.json();",
+                  "pm.collectionVariables.set(\"bCopyRouteId\", String(data.id));",
+                  "pm.test(\"Статус PLANNED\", function () { pm.expect(data.status).to.eql(\"PLANNED\"); });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "17. У новой копии есть собственная остановка",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/stops",
+            "description": "Ожидается HTTP 200. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.expect(pm.response.code).to.eql(200); });",
+                  "if (pm.response.code === 200) {",
+                  "const data = pm.response.json();",
+                  "const copiedStops = data.filter(s => s.routeId === Number(pm.collectionVariables.get(\"bCopyRouteId\")));",
+                  "pm.test(\"Скопирована одна остановка\", function () { pm.expect(copiedStops.length).to.eql(1); });",
+                  "if (copiedStops.length === 1) { pm.collectionVariables.set(\"bCopyStopId\", String(copiedStops[0].id)); }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "18. Старые назначения не скопированы",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/shipment-assignments",
+            "description": "Ожидается HTTP 200. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.expect(pm.response.code).to.eql(200); });",
+                  "if (pm.response.code === 200) {",
+                  "const data = pm.response.json();",
+                  "pm.test(\"В копии ещё нет назначений\", function () { pm.expect(data.filter(a => a.stopId === Number(pm.collectionVariables.get(\"bCopyStopId\"))).length).to.eql(0); });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "19. Тяжёлое отправление для проверки лимита",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/shipments",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"senderId\": {{bUserId}},\n  \"address\": \"Moscow, Aviamotornaya 8\",\n  \"weight\": 21\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Ожидается HTTP 201. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", function () { pm.expect(pm.response.code).to.eql(201); });",
+                  "if (pm.response.code === 201) {",
+                  "const data = pm.response.json();",
+                  "pm.collectionVariables.set(\"bCancelShipmentId\", String(data.id));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "20. Превышение грузоподъёмности отклоняется",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/shipment-assignments",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"shipmentId\": {{bCancelShipmentId}},\n  \"stopId\": {{bCopyStopId}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Ожидается HTTP 409. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 409\", function () { pm.expect(pm.response.code).to.eql(409); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "21. Уменьшить вес свободного отправления",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/shipments/{{bCancelShipmentId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"weight\": 3.5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Ожидается HTTP 200. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.expect(pm.response.code).to.eql(200); });",
+                  "if (pm.response.code === 200) {",
+                  "const data = pm.response.json();",
+                  "pm.test(\"Поле weight\", function () { pm.expect(data.weight).to.eql(3.5); });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "22. Теперь назначение допустимо",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/shipment-assignments",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"shipmentId\": {{bCancelShipmentId}},\n  \"stopId\": {{bCopyStopId}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Ожидается HTTP 201. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", function () { pm.expect(pm.response.code).to.eql(201); });",
+                  "if (pm.response.code === 201) {",
+                  "const data = pm.response.json();",
+                  "pm.collectionVariables.set(\"bCancelAssignmentId\", String(data.id));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "23. Нельзя уменьшить лимит ниже загрузки",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/routes/{{bCopyRouteId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"maxWeight\": 3\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Ожидается HTTP 409. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 409\", function () { pm.expect(pm.response.code).to.eql(409); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "24. Лимит остался прежним после отказа",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/routes/{{bCopyRouteId}}",
+            "description": "Ожидается HTTP 200. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.expect(pm.response.code).to.eql(200); });",
+                  "if (pm.response.code === 200) {",
+                  "const data = pm.response.json();",
+                  "pm.test(\"Поле maxWeight\", function () { pm.expect(data.maxWeight).to.eql(20); });",
+                  "pm.test(\"Статус PLANNED\", function () { pm.expect(data.status).to.eql(\"PLANNED\"); });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "25. Отменить плановый маршрут",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/routes/{{bCopyRouteId}}/cancel",
+            "description": "Ожидается HTTP 200. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.expect(pm.response.code).to.eql(200); });",
+                  "if (pm.response.code === 200) {",
+                  "const data = pm.response.json();",
+                  "pm.test(\"Статус CANCELLED\", function () { pm.expect(data.status).to.eql(\"CANCELLED\"); });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "26. Его назначение тоже отменено",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/shipment-assignments/{{bCancelAssignmentId}}",
+            "description": "Ожидается HTTP 200. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.expect(pm.response.code).to.eql(200); });",
+                  "if (pm.response.code === 200) {",
+                  "const data = pm.response.json();",
+                  "pm.test(\"Статус CANCELLED\", function () { pm.expect(data.status).to.eql(\"CANCELLED\"); });",
+                  "pm.test(\"Поле completedAt\", function () { pm.expect(data.completedAt).to.eql(null); });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "27. Отправление свободно и не вручено",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/shipments/{{bCancelShipmentId}}",
+            "description": "Ожидается HTTP 200. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.expect(pm.response.code).to.eql(200); });",
+                  "if (pm.response.code === 200) {",
+                  "const data = pm.response.json();",
+                  "pm.test(\"Статус CREATED\", function () { pm.expect(data.status).to.eql(\"CREATED\"); });",
+                  "pm.test(\"Поле deliveredAt\", function () { pm.expect(data.deliveredAt).to.eql(null); });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "28. Ещё один плановый маршрут для переназначения",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/routes/{{bRouteId}}/repeat",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"date\": \"{{repeatDate}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Ожидается HTTP 201. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", function () { pm.expect(pm.response.code).to.eql(201); });",
+                  "if (pm.response.code === 201) {",
+                  "const data = pm.response.json();",
+                  "pm.collectionVariables.set(\"bReassignRouteId\", String(data.id));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "29. Найти остановку нового маршрута",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/stops",
+            "description": "Ожидается HTTP 200. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.expect(pm.response.code).to.eql(200); });",
+                  "if (pm.response.code === 200) {",
+                  "const data = pm.response.json();",
+                  "const stops = data.filter(s => s.routeId === Number(pm.collectionVariables.get(\"bReassignRouteId\")));",
+                  "pm.test(\"Новая остановка существует\", function () { pm.expect(stops.length).to.eql(1); });",
+                  "if (stops.length === 1) { pm.collectionVariables.set(\"bReassignStopId\", String(stops[0].id)); }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "30. Отменённое назначение не мешает новому",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/shipment-assignments",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"shipmentId\": {{bCancelShipmentId}},\n  \"stopId\": {{bReassignStopId}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Ожидается HTTP 201. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", function () { pm.expect(pm.response.code).to.eql(201); });",
+                  "if (pm.response.code === 201) {",
+                  "const data = pm.response.json();",
+                  "pm.collectionVariables.set(\"bReplacementAssignmentId\", String(data.id));",
+                  "pm.test(\"Статус ASSIGNED\", function () { pm.expect(data.status).to.eql(\"ASSIGNED\"); });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "31. Завершить сценарий отменой нового маршрута",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/routes/{{bReassignRouteId}}/cancel",
+            "description": "Ожидается HTTP 200. Выполнять запросы по порядку."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.expect(pm.response.code).to.eql(200); });",
+                  "if (pm.response.code === 200) {",
+                  "const data = pm.response.json();",
+                  "pm.test(\"Статус CANCELLED\", function () { pm.expect(data.status).to.eql(\"CANCELLED\"); });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

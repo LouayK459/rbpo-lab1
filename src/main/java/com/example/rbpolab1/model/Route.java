@@ -1,13 +1,30 @@
 package com.example.rbpolab1.model;
 
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
+@Entity
+@Table(name = "routes", schema = "delivery")
 public class Route {
 
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(name = "route_date", nullable = false)
     private LocalDate date;
+
+    @Column(name = "max_weight", nullable = false, precision = 12, scale = 3)
     private BigDecimal maxWeight;
+
+    @Column(nullable = false, length = 20)
     private String status;
 
     public Route() {

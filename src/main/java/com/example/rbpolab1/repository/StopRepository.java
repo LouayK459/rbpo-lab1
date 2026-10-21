@@ -1,56 +1,29 @@
 package com.example.rbpolab1.repository;
 
 import com.example.rbpolab1.model.Stop;
-import org.springframework.stereotype.Repository;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 
-@Repository
-public class StopRepository {
+public interface StopRepository extends JpaRepository<Stop, Long> {
 
-    private final Map<Long, Stop> stops = new LinkedHashMap<>();
-    private long nextId = 1;
+    @Query("select count(s) > 0 from Stop s where s.route.id = :routeId")
+    boolean existsByRouteId(@Param("routeId") Long routeId);
 
-    public synchronized List<Stop> findAll() {
-        return new ArrayList<>(stops.values());
-    }
+    @Query("""
+            select count(s) > 0
+            from Stop s
+            where s.route.id = :routeId
+              and s.sequenceNumber = :sequenceNumber
+              and (:excludedId is null or s.id <> :excludedId)
+            """)
+    boolean isSequenceNumberTaken(
+            @Param("routeId") Long routeId,
+            @Param("sequenceNumber") Integer sequenceNumber,
+            @Param("excludedId") Long excludedId);
 
-    public synchronized Optional<Stop> findById(Long id) {
-        return Optional.ofNullable(stops.get(id));
-    }
-
-    public synchronized boolean existsById(Long id) {
-        return stops.containsKey(id);
-    }
-
-    public synchronized boolean existsByRouteId(Long routeId) {
-        return stops.values().stream()
-                .anyMatch(stop -> routeId.equals(stop.getRouteId()));
-    }
-
-    public synchronized boolean isSequenceNumberTaken(
-            Long routeId, Integer sequenceNumber, Long excludedId) {
-        return stops.values().stream()
-                .anyMatch(stop ->
-                        routeId.equals(stop.getRouteId())
-                                && sequenceNumber.equals(stop.getSequenceNumber())
-                                && !stop.getId().equals(excludedId));
-    }
-
-    public synchronized Stop save(Stop stop) {
-        if (stop.getId() == null) {
-            stop.setId(nextId++);
-        }
-
-        stops.put(stop.getId(), stop);
-        return stop;
-    }
-
-    public synchronized void deleteById(Long id) {
-        stops.remove(id);
-    }
+    @Query("select s from Stop s where s.route.id = :routeId order by s.sequenceNumber")
+    List<Stop> findByRouteId(@Param("routeId") Long routeId);
 }

@@ -1,61 +1,50 @@
 package com.example.rbpolab1.repository;
 
 import com.example.rbpolab1.model.ShipmentAssignment;
-import org.springframework.stereotype.Repository;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
+import java.math.BigDecimal;
 import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 
-@Repository
-public class ShipmentAssignmentRepository {
+public interface ShipmentAssignmentRepository
+        extends JpaRepository<ShipmentAssignment, Long> {
 
-    private final Map<Long, ShipmentAssignment> assignments =
-            new LinkedHashMap<>();
+    @Query("select count(a) > 0 from ShipmentAssignment a where a.shipment.id = :shipmentId")
+    boolean existsByShipmentId(@Param("shipmentId") Long shipmentId);
 
-    private long nextId = 1;
+    @Query("select count(a) > 0 from ShipmentAssignment a where a.stop.id = :stopId")
+    boolean existsByStopId(@Param("stopId") Long stopId);
 
-    public synchronized List<ShipmentAssignment> findAll() {
-        return new ArrayList<>(assignments.values());
-    }
+    @Query("""
+            select count(a) > 0
+            from ShipmentAssignment a
+            where a.shipment.id = :shipmentId
+              and a.status in ('ASSIGNED', 'IN_PROGRESS')
+              and (:excludedId is null or a.id <> :excludedId)
+            """)
+    boolean isShipmentAssigned(
+            @Param("shipmentId") Long shipmentId,
+            @Param("excludedId") Long excludedId);
 
-    public synchronized Optional<ShipmentAssignment> findById(Long id) {
-        return Optional.ofNullable(assignments.get(id));
-    }
+    @Query("""
+            select coalesce(sum(a.shipment.weight), 0)
+            from ShipmentAssignment a
+            where a.stop.route.id = :routeId
+              and a.status in ('ASSIGNED', 'IN_PROGRESS')
+              and (:excludedId is null or a.id <> :excludedId)
+            """)
+    BigDecimal totalWeightForRoute(
+            @Param("routeId") Long routeId,
+            @Param("excludedId") Long excludedId);
 
-    public synchronized boolean existsByShipmentId(Long shipmentId) {
-        return assignments.values().stream()
-                .anyMatch(assignment ->
-                        shipmentId.equals(assignment.getShipmentId()));
-    }
-
-    public synchronized boolean existsByStopId(Long stopId) {
-        return assignments.values().stream()
-                .anyMatch(assignment ->
-                        stopId.equals(assignment.getStopId()));
-    }
-
-    public synchronized boolean isShipmentAssigned(
-            Long shipmentId, Long excludedId) {
-        return assignments.values().stream()
-                .anyMatch(assignment ->
-                        shipmentId.equals(assignment.getShipmentId())
-                                && !assignment.getId().equals(excludedId));
-    }
-
-    public synchronized ShipmentAssignment save(
-            ShipmentAssignment assignment) {
-        if (assignment.getId() == null) {
-            assignment.setId(nextId++);
-        }
-
-        assignments.put(assignment.getId(), assignment);
-        return assignment;
-    }
-
-    public synchronized void deleteById(Long id) {
-        assignments.remove(id);
-    }
+    @Query("""
+            select a from ShipmentAssignment a
+            join fetch a.shipment
+            join fetch a.stop
+            where a.stop.route.id = :routeId
+            order by a.stop.sequenceNumber, a.id
+            """)
+    List<ShipmentAssignment> findByRouteId(@Param("routeId") Long routeId);
 }

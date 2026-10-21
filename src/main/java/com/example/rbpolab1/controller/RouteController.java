@@ -1,6 +1,7 @@
 package com.example.rbpolab1.controller;
 
 import com.example.rbpolab1.model.Route;
+import com.example.rbpolab1.service.DeliveryService;
 import com.example.rbpolab1.service.RouteService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -13,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -20,9 +22,12 @@ import java.util.List;
 public class RouteController {
 
     private final RouteService routeService;
+    private final DeliveryService deliveryService;
 
-    public RouteController(RouteService routeService) {
+    public RouteController(RouteService routeService,
+                           DeliveryService deliveryService) {
         this.routeService = routeService;
+        this.deliveryService = deliveryService;
     }
 
     @GetMapping
@@ -67,9 +72,39 @@ public class RouteController {
         return ResponseEntity.noContent().build();
     }
 
+    @PostMapping("/{id}/start")
+    public Route start(@PathVariable("id") Long id) {
+        return deliveryService.startRoute(id);
+    }
+
+    @PostMapping("/{id}/complete")
+    public Route complete(@PathVariable("id") Long id) {
+        return deliveryService.completeRoute(id);
+    }
+
+    @PostMapping("/{id}/cancel")
+    public Route cancel(@PathVariable("id") Long id) {
+        return deliveryService.cancelRoute(id);
+    }
+
+    @PostMapping("/{id}/repeat")
+    public ResponseEntity<Route> repeat(
+            @PathVariable("id") Long id,
+            @RequestBody RepeatRouteRequest request) {
+        if (request == null) {
+            throw new IllegalArgumentException("Request body is required");
+        }
+
+        Route route = deliveryService.repeatRoute(id, request.date());
+        return ResponseEntity.status(HttpStatus.CREATED).body(route);
+    }
+
     private void validateRequest(Route request) {
         if (request == null) {
             throw new IllegalArgumentException("Request body is required");
         }
+    }
+
+    public record RepeatRouteRequest(LocalDate date) {
     }
 }

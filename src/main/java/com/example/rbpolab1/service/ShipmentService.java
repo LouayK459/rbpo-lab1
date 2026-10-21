@@ -1,18 +1,23 @@
 package com.example.rbpolab1.service;
 
 import com.example.rbpolab1.model.Shipment;
+import com.example.rbpolab1.model.User;
 import com.example.rbpolab1.repository.ShipmentAssignmentRepository;
 import com.example.rbpolab1.repository.ShipmentRepository;
 import com.example.rbpolab1.repository.UserRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.Set;
 
 @Service
+@Transactional(isolation = Isolation.SERIALIZABLE)
 public class ShipmentService {
 
     private final ShipmentRepository shipmentRepository;
@@ -38,9 +43,9 @@ public class ShipmentService {
                         new NoSuchElementException("Shipment not found"));
     }
 
-    public synchronized Shipment create(Long senderId, String address,
-                                        BigDecimal weight, String status) {
-        validateSender(senderId);
+    public Shipment create(Long senderId, String address,
+                           BigDecimal weight, String status) {
+        User sender = validateSender(senderId);
         String validAddress = validateAddress(address);
         validateWeight(weight);
 
@@ -48,21 +53,25 @@ public class ShipmentService {
                 status == null ? "CREATED" : status
         );
 
-        Shipment shipment = new Shipment(
-                null,
-                senderId,
-                validAddress,
-                weight,
-                validStatus,
-                Instant.now()
-        );
+        if (!"CREATED".equals(validStatus)) {
+            throw new IllegalStateException(
+                    "A new shipment must have status CREATED"
+            );
+        }
+
+        Shipment shipment = new Shipment();
+        shipment.setSender(sender);
+        shipment.setAddress(validAddress);
+        shipment.setWeight(weight);
+        shipment.setStatus(validStatus);
+        shipment.setCreatedAt(Instant.now());
 
         return shipmentRepository.save(shipment);
     }
 
-    public synchronized Shipment update(Long id, Long senderId,
-                                        String address, BigDecimal weight,
-                                        String status) {
+    public Shipment update(Long id, Long senderId,
+                           String address, BigDecimal weight,
+                           String status) {
         Shipment existingShipment = findById(id);
 
         Long updatedSenderId = senderId == null
@@ -77,25 +86,45 @@ public class ShipmentService {
         String updatedStatus = status == null
                 ? existingShipment.getStatus() : status;
 
-        validateSender(updatedSenderId);
+        User sender = validateSender(updatedSenderId);
         updatedAddress = validateAddress(updatedAddress);
         validateWeight(updatedWeight);
         updatedStatus = validateStatus(updatedStatus);
 
-        Shipment updatedShipment = new Shipment(
-                id,
-                updatedSenderId,
-                updatedAddress,
-                updatedWeight,
-                updatedStatus,
-                existingShipment.getCreatedAt()
-        );
+        if (!updatedStatus.equals(existingShipment.getStatus())) {
+            throw new IllegalStateException(
+                    "Use delivery operations to change shipment status"
+            );
+        }
 
-        return shipmentRepository.save(updatedShipment);
+        boolean changed = !Objects.equals(
+                updatedSenderId, existingShipment.getSenderId()
+        ) || !Objects.equals(
+                updatedAddress, existingShipment.getAddress()
+        ) || updatedWeight.compareTo(existingShipment.getWeight()) != 0;
+
+        if (changed && (!"CREATED".equals(existingShipment.getStatus())
+                || assignmentRepository.isShipmentAssigned(id, null))) {
+            throw new IllegalStateException(
+                    "Cannot edit a shipment with an active delivery or after dispatch"
+            );
+        }
+
+        existingShipment.setSender(sender);
+        existingShipment.setAddress(updatedAddress);
+        existingShipment.setWeight(updatedWeight);
+
+        return shipmentRepository.save(existingShipment);
     }
 
-    public synchronized void delete(Long id) {
-        findById(id);
+    public void delete(Long id) {
+        Shipment existingShipment = findById(id);
+
+        if (!"CREATED".equals(existingShipment.getStatus())) {
+            throw new IllegalStateException(
+                    "Only a shipment with status CREATED can be deleted"
+            );
+        }
 
         if (assignmentRepository.existsByShipmentId(id)) {
             throw new IllegalStateException(
@@ -103,19 +132,19 @@ public class ShipmentService {
             );
         }
 
-        shipmentRepository.deleteById(id);
+        shipmentRepository.delete(existingShipment);
     }
 
-    private void validateSender(Long senderId) {
+    private User validateSender(Long senderId) {
         if (senderId == null || senderId <= 0) {
             throw new IllegalArgumentException(
                     "Valid senderId is required"
             );
         }
 
-        if (!userRepository.existsById(senderId)) {
-            throw new NoSuchElementException("Sender not found");
-        }
+        return userRepository.findById(senderId)
+                .orElseThrow(() ->
+                        new NoSuchElementException("Sender not found"));
     }
 
     private String validateAddress(String address) {
@@ -123,12 +152,27 @@ public class ShipmentService {
             throw new IllegalArgumentException("Address is required");
         }
 
-        return address.trim();
+        String validAddress = address.trim();
+
+        if (validAddress.length() > 255) {
+            throw new IllegalArgumentException(
+                    "Address must not exceed 255 characters"
+            );
+        }
+
+        return validAddress;
     }
 
     private void validateWeight(BigDecimal weight) {
         if (weight == null || weight.compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException("Weight must be positive");
+        }
+
+        if (weight.compareTo(new BigDecimal("1000000000")) >= 0
+                || weight.stripTrailingZeros().scale() > 3) {
+            throw new IllegalArgumentException(
+                    "Weight must be less than 1000000000 and have at most 3 decimal places"
+            );
         }
     }
 
