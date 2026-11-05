@@ -4,6 +4,7 @@ import com.example.rbpolab1.model.Shipment;
 import com.example.rbpolab1.service.ShipmentService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -26,16 +27,19 @@ public class ShipmentController {
     }
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('SENDER', 'DISPATCHER')")
     public List<Shipment> findAll() {
         return shipmentService.findAll();
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("@accessRules.canReadShipment(#id)")
     public Shipment findById(@PathVariable("id") Long id) {
         return shipmentService.findById(id);
     }
 
     @PostMapping
+    @PreAuthorize("@accessRules.canCreateShipment(#request)")
     public ResponseEntity<Shipment> create(@RequestBody Shipment request) {
         validateRequest(request);
 
@@ -50,6 +54,7 @@ public class ShipmentController {
     }
 
     @PatchMapping("/{id}")
+    @PreAuthorize("@accessRules.canUpdateShipment(#id, #request)")
     public Shipment update(@PathVariable("id") Long id,
                            @RequestBody Shipment request) {
         validateRequest(request);
@@ -64,6 +69,7 @@ public class ShipmentController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("@accessRules.canReadShipment(#id)")
     public ResponseEntity<Void> delete(@PathVariable("id") Long id) {
         shipmentService.delete(id);
         return ResponseEntity.noContent().build();
