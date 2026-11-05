@@ -5,6 +5,7 @@ import com.example.rbpolab1.model.User;
 import com.example.rbpolab1.repository.ShipmentAssignmentRepository;
 import com.example.rbpolab1.repository.ShipmentRepository;
 import com.example.rbpolab1.repository.UserRepository;
+import com.example.rbpolab1.security.AccessRules;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,24 +24,33 @@ public class ShipmentService {
     private final ShipmentRepository shipmentRepository;
     private final UserRepository userRepository;
     private final ShipmentAssignmentRepository assignmentRepository;
+    private final AccessRules accessRules;
 
     public ShipmentService(
             ShipmentRepository shipmentRepository,
             UserRepository userRepository,
-            ShipmentAssignmentRepository assignmentRepository) {
+            ShipmentAssignmentRepository assignmentRepository,
+            AccessRules accessRules) {
         this.shipmentRepository = shipmentRepository;
         this.userRepository = userRepository;
         this.assignmentRepository = assignmentRepository;
+        this.accessRules = accessRules;
     }
 
     public List<Shipment> findAll() {
-        return shipmentRepository.findAll();
+        if (accessRules.isDispatcher()) {
+            return shipmentRepository.findAll();
+        }
+        return shipmentRepository.findBySenderId(accessRules.currentUserId());
     }
 
     public Shipment findById(Long id) {
-        return shipmentRepository.findById(id)
+        Shipment shipment = shipmentRepository.findById(id)
                 .orElseThrow(() ->
                         new NoSuchElementException("Shipment not found"));
+
+        accessRules.requireSenderAccess(shipment.getSenderId());
+        return shipment;
     }
 
     public Shipment create(Long senderId, String address,
@@ -142,6 +152,7 @@ public class ShipmentService {
             );
         }
 
+        accessRules.requireSenderAccess(senderId);
         return userRepository.findById(senderId)
                 .orElseThrow(() ->
                         new NoSuchElementException("Sender not found"));
