@@ -5,7 +5,9 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
+import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -13,17 +15,24 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.context.RequestAttributeSecurityContextRepository;
-import org.springframework.security.web.csrf.CsrfException;
-import org.springframework.security.web.csrf.HttpSessionCsrfTokenRepository;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.context.NullSecurityContextRepository;
 
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.time.Instant;
+import java.time.Clock;
 
 @Configuration
 @EnableMethodSecurity
 public class SecurityConfig {
+
+    @Bean
+    public Clock clock() {
+        return Clock.systemUTC();
+    }
+
+    @Bean
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration configuration) throws Exception {
+        return configuration.getAuthenticationManager();
+    }
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -40,57 +49,37 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(
-            HttpSecurity http, DaoAuthenticationProvider authenticationProvider) throws Exception {
-
-        // Authentication is checked on every request; the session stores only the CSRF token.
-        RequestAttributeSecurityContextRepository contexts =
-                new RequestAttributeSecurityContextRepository();
+            HttpSecurity http, DaoAuthenticationProvider authenticationProvider,
+            JwtTokenProvider jwt, DatabaseUserDetailsService users) throws Exception {
 
         http
                 .authenticationProvider(authenticationProvider)
-                .securityContext(context -> context.securityContextRepository(contexts))
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.NEVER))
+                .securityContext(context -> context.securityContextRepository(new NullSecurityContextRepository()))
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .requestCache(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable)
                 .logout(AbstractHttpConfigurer::disable)
-                .httpBasic(basic -> basic
-                        .securityContextRepository(contexts)
-                        .authenticationEntryPoint((request, response, exception) ->
-                                authenticationRequired(response)))
+                .httpBasic(AbstractHttpConfigurer::disable)
                 .exceptionHandling(errors -> errors
                         .authenticationEntryPoint((request, response, exception) ->
-                                authenticationRequired(response))
+                                AuthenticationErrors.unauthorized(response))
                         .accessDeniedHandler((request, response, exception) ->
-                                writeError(response, HttpServletResponse.SC_FORBIDDEN,
-                                        exception instanceof CsrfException
-                                                ? "CSRF token missing or invalid"
-                                                : "Access denied")))
-                .csrf(csrf -> csrf.csrfTokenRepository(new HttpSessionCsrfTokenRepository()))
+                                AuthenticationErrors.write(response, HttpServletResponse.SC_FORBIDDEN, "Access denied")))
+                // Authentication uses explicit Bearer headers and JSON, with no authentication cookies.
+                .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(access -> access
                         .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/auth/csrf").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/auth/register").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/auth/login", "/auth/register", "/auth/refresh").permitAll()
                         .requestMatchers("/api/routes/**", "/api/stops/**",
                                 "/api/shipment-assignments/**", "/api/accounts/**")
                         .hasRole("DISPATCHER")
                         .requestMatchers("/api/users/**", "/api/shipments/**", "/api/auth/me")
                         .hasAnyRole("SENDER", "DISPATCHER")
-                        .anyRequest().authenticated());
+                        .anyRequest().authenticated())
+                // Created only here, so it is not also registered as a servlet filter.
+                .addFilterBefore(new JwtTokenFilter(jwt, users), UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
 
-    private void authenticationRequired(HttpServletResponse response) throws IOException {
-        response.setHeader("WWW-Authenticate", "Basic realm=\"delivery\", charset=\"UTF-8\"");
-        writeError(response, HttpServletResponse.SC_UNAUTHORIZED,
-                "Authentication required or invalid credentials");
-    }
-
-    private void writeError(HttpServletResponse response, int status, String message) throws IOException {
-        response.setStatus(status);
-        response.setContentType("application/json");
-        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
-        response.getWriter().write("{\"error\":\"" + message
-                + "\",\"timestamp\":\"" + Instant.now() + "\"}");
-    }
 }
