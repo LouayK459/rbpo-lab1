@@ -18,3 +18,9 @@ spring:
   sql:
     init:
       mode: never
+
+jwt:
+  secret: "${JWT_SECRET}"
+  # Milliseconds; positive whole seconds. Defaults: access 15 minutes, refresh 7 days.
+  accessExpiration: ${JWT_ACCESS_EXPIRATION:900000}
+  refreshExpiration: ${JWT_REFRESH_EXPIRATION:604800000}
